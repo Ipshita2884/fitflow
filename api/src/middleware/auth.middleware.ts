@@ -1,37 +1,28 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { ApiError } from '../lib/errors';
+import { env } from '../config/env';
 
-export interface AuthPayload {
-  userId: string;
-  role: 'TRAINER' | 'CLIENT' | 'ADMIN';
-  // present only for CLIENT role — the trainer they belong to. Used by RBAC
-  // checks so we never trust a client-supplied trainerId from the request body.
-  trainerId?: string;
+export interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    role: string;
+  };
 }
 
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Express {
-    interface Request {
-      auth?: AuthPayload;
-    }
-  }
-}
-
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    return next(new ApiError(401, 'Missing or malformed Authorization header'));
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', message: 'Unauthorized' });
   }
 
-  const token = header.slice('Bearer '.length);
+  const token = authHeader.split(' ')[1];
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as AuthPayload;
-    req.auth = payload;
-    return next();
-  } catch {
-    return next(new ApiError(401, 'Invalid or expired token'));
+    const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string };
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ status: 'error', message: 'Invalid or expired token' });
   }
-}
+};
