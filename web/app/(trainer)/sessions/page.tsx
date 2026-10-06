@@ -1,32 +1,36 @@
 import { Card } from "@/components/ui/card";
 import { Calendar, Users, Image as ImageIcon } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { CreateSessionModal } from "@/components/trainer/CreateSessionModal";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+
 export default async function SessionsPage() {
   const session = await getSession();
-  if (!session || !session.userId) redirect("/login");
+  if (!session || !session.userId || !session.token) redirect("/login");
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId as string },
-    include: { trainerProfile: true },
-  });
+  const [sessionsRes, clientsRes] = await Promise.all([
+    fetch(`${API_URL}/sessions`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+      cache: "no-store",
+    }),
+    fetch(`${API_URL}/clients`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+      cache: "no-store",
+    })
+  ]);
 
-  const trainerId = user?.trainerProfile?.id;
-  if (!trainerId) redirect("/login");
+  if (!sessionsRes.ok || !clientsRes.ok) {
+    if (sessionsRes.status === 401 || clientsRes.status === 401) redirect("/login");
+  }
 
-  const upcomingSessions = await prisma.session.findMany({
-    where: { trainerId, status: "SCHEDULED" },
-    orderBy: { scheduledDate: 'asc' },
-    include: { bookings: true }
-  });
+  const sessionsData = sessionsRes.ok ? await sessionsRes.json() : { items: [] };
+  const clientsData = clientsRes.ok ? await clientsRes.json() : { data: [] };
 
-  const clients = await prisma.clientProfile.findMany({
-    where: { trainerId },
-    select: { id: true, fullName: true }
-  });
+  const upcomingSessions = sessionsData.items || sessionsData.data || [];
+  const clients = clientsData.data || [];
+
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">

@@ -1,56 +1,115 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
-export async function createClientAction(formData: FormData) {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+
+export async function createClientAction(data: any) {
   const session = await getSession();
   if (!session || !session.userId) throw new Error("Unauthorized");
 
-  const trainerUser = await prisma.user.findUnique({
-    where: { id: session.userId as string },
-    include: { trainerProfile: true }
+  const res = await fetch(`${API_URL}/clients`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.token}`
+    },
+    body: JSON.stringify(data),
   });
 
-  if (!trainerUser || trainerUser.role !== "TRAINER" || !trainerUser.trainerProfile) {
-    throw new Error("Unauthorized");
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || "Failed to create client");
   }
 
-  const fullName = formData.get("fullName") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const phone = formData.get("phone") as string || null;
+  const json = await res.json();
+  revalidatePath("/clients");
+  return json.data?.client;
+}
 
-  if (!fullName || !email || !password) {
-    throw new Error("Missing required fields");
+export async function associateClientAction(payload: { email?: string; phone?: string; clientId?: string }) {
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_URL}/clients/associate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.token}`
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || "Failed to associate client");
   }
 
-  // Hash password
-  const passwordHash = await bcrypt.hash(password, 10);
+  const json = await res.json();
+  revalidatePath("/clients");
+  return json.data?.client;
+}
 
-  // Check if email already exists
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new Error("A user with this email already exists");
-  }
+export async function findClientAction(identifier: string) {
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
 
-  // Create user and link to trainer
-  await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      role: "CLIENT",
-      clientProfile: {
-        create: {
-          fullName,
-          phone,
-          trainerId: trainerUser.trainerProfile.id
-        }
-      }
+  const res = await fetch(`${API_URL}/clients/find?identifier=${encodeURIComponent(identifier)}`, {
+    headers: {
+      "Authorization": `Bearer ${session.token}`
     }
   });
 
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || "Failed to find client");
+  }
+
+  const json = await res.json();
+  return json.data;
+}
+
+export async function archiveClientAction(clientId: string) {
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
+
+  const res = await fetch(`${API_URL}/clients/${clientId}/archive`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${session.token}`
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to archive client");
+  }
+
   revalidatePath("/clients");
+}
+
+export async function updateClientAction(clientId: string, formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) throw new Error("Unauthorized");
+
+  const fullName = formData.get("fullName") as string;
+  const phone = formData.get("phone") as string || undefined;
+  const status = formData.get("status") as string;
+
+  const res = await fetch(`${API_URL}/clients/${clientId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.token}`
+    },
+    body: JSON.stringify({ fullName, phone, status }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Failed to update client");
+  }
+
+  revalidatePath(`/clients`);
+  revalidatePath(`/clients/${clientId}`);
 }

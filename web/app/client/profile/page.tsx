@@ -14,7 +14,16 @@ export default async function ClientProfilePage() {
     include: { clientProfile: true }
   });
 
-  if (!user || !user.clientProfile) redirect("/login");
+  if (!user || !user.clientProfile) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card glass className="p-8 border-red-500/20 bg-red-500/10">
+          <h2 className="text-xl font-bold text-red-500 mb-2">Profile Not Found</h2>
+          <p className="text-slate-300">We couldn't find your client profile. Please contact support to fix your account setup.</p>
+        </Card>
+      </div>
+    );
+  }
   const profile = user.clientProfile;
 
   return (

@@ -14,7 +14,16 @@ export default async function ClientSchedulePage() {
   });
 
   const clientId = user?.clientProfile?.id;
-  if (!clientId) redirect("/login");
+  if (!clientId) {
+    return (
+      <div className="space-y-8 max-w-5xl mx-auto pb-12">
+        <Card glass className="p-8 border-red-500/20 bg-red-500/10">
+          <h2 className="text-xl font-bold text-red-500 mb-2">Profile Not Found</h2>
+          <p className="text-slate-300">We couldn't find your client profile. Please contact support to fix your account setup.</p>
+        </Card>
+      </div>
+    );
+  }
 
   // Fetch all bookings for this client
   const bookings = await prisma.sessionBooking.findMany({

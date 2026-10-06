@@ -1,24 +1,37 @@
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { getSession } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   
-  if (!session || !session.userId) {
+  if (!session || !session.userId || !session.token) {
     redirect("/login");
   }
 
-  // Fetch the real user data
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId as string },
-  });
+  // Fetch real user data from Express API
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+  let user = null;
+  try {
+    const res = await fetch(`${API_URL}/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+      },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      user = data.data.user;
+    }
+  } catch (err) {
+    // API unavailable or token invalid
+  }
 
   if (!user || user.role !== "ADMIN") {
-    // If they aren't an admin, kick them back out
+    // If not admin, redirect to login
     redirect("/login");
   }
+
 
   const initials = "AD";
 

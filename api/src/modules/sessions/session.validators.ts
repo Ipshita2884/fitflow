@@ -8,7 +8,7 @@ export const sessionExerciseSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export const createSessionSchema = z.object({
+const baseSessionSchema = z.object({
   name: z.string().min(3).max(120),
   description: z.string().max(1000).optional(),
   category: z.enum([
@@ -22,15 +22,16 @@ export const createSessionSchema = z.object({
   mode: z.enum(['IN_PERSON', 'ONLINE']),
   location: z.string().max(200).optional(),
   estimatedCalories: z.number().int().positive().optional(),
-  // The Session Builder sends the full warm-up → main → cooldown structure.
-  // At least one exercise total is required so a "session" can't be created empty.
   exercises: z.array(sessionExerciseSchema).min(1),
-}).refine(
+});
+
+export const createSessionSchema = baseSessionSchema.refine(
   (data) => data.mode === 'ONLINE' || (data.location && data.location.length > 0),
   { message: 'Location is required for in-person sessions', path: ['location'] },
 );
 
-export const updateSessionSchema = createSessionSchema.partial();
+export const updateSessionSchema = baseSessionSchema.partial();
+
 
 export const listSessionsQuerySchema = z.object({
   from: z.coerce.date().optional(),

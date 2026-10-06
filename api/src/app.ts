@@ -8,6 +8,13 @@ import { setupSwagger } from './config/swagger';
 
 // Import routers
 import authRoutes from './modules/auth/auth.routes';
+import clientsRoutes from './modules/clients/clients.routes';
+import sessionsRoutes from './modules/sessions/session.routes';
+import bookingsRoutes from './modules/bookings/booking.routes';
+import attendanceRoutes from './modules/attendance/attendance.routes';
+import messageRoutes from './modules/messages/message.routes';
+import adminRoutes from './modules/admin/admin.routes';
+import trainerRoutes from './modules/trainers/trainer.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
@@ -23,6 +30,18 @@ setupSwagger(app);
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/clients', clientsRoutes);
+app.use('/api/v1/sessions', sessionsRoutes);
+app.use('/api/v1/bookings', bookingsRoutes);
+app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/trainer', trainerRoutes);
+app.use('/api/v1', messageRoutes);
+
+
+
+
+
 
 // Basic health check
 app.get('/health', (req, res) => {

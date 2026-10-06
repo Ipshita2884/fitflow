@@ -9,8 +9,6 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  // If we're on the server side (e.g. in a Server Action or RSC), getSession reads the cookies.
-  // We can inject the token here.
   try {
     const session = await getSession();
     if (session?.token) {
@@ -21,3 +19,27 @@ apiClient.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+
+      if (error.response?.status === 401) {
+        if (!currentPath.startsWith('/auth') && !currentPath.startsWith('/login')) {
+          const safeReturnTo = encodeURIComponent(currentPath);
+          window.location.href = `/auth/error?code=session_expired&returnTo=${safeReturnTo}`;
+        }
+      } else if (error.response?.status === 403) {
+        if (currentPath !== '/unauthorized') {
+          const safeReturnTo = encodeURIComponent(currentPath);
+          window.location.href = `/unauthorized?reason=role&returnTo=${safeReturnTo}`;
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+
